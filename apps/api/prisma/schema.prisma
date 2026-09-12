@@ -1,0 +1,225 @@
+// DSARats — Prisma schema
+// Phase 2: auth (User, Profile, Session)
+// Phase 3: content (DSASheet, SheetTopic, Topic, Problem, SheetProblem, UserSheetProgress)
+// Later phases add progress, streak, revision, notes, analytics entities.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  passwordHash    String?
+  googleId        String?       @unique
+  role            UserRole      @default(USER)
+  status          AccountStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  profile       Profile?
+  sessions      Session[]
+  sheetProgress UserSheetProgress[]
+
+  @@index([status])
+}
+
+model Profile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  username      String   @unique
+  displayName   String?
+  avatarUrl     String?
+  bio           String?
+  timezone      String   @default("UTC")
+  theme         Theme    @default(SYSTEM)
+  learningGoal  Int?
+  longestStreak Int      @default(0)
+  onboardedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ── Phase 3: DSA content ─────────────────────────────────────────────────────
+
+enum SheetDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ProblemDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Platform {
+  LEETCODE
+  GEEKSFORGEEKS
+  CODEFORCES
+  OTHER
+}
+
+enum SheetProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model DSASheet {
+  id                String           @id @default(uuid())
+  slug              String           @unique
+  name              String
+  description       String
+  difficulty        SheetDifficulty  @default(BEGINNER)
+  estimatedHours    Int?
+  isPublished       Boolean          @default(false)
+  sourceAttribution String?
+  order             Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  topics       SheetTopic[]
+  problems     SheetProblem[]
+  userProgress UserSheetProgress[]
+
+  @@index([isPublished, order])
+}
+
+/** Ordered list of topics within a sheet (grouping + ordering of its problems). */
+model SheetTopic {
+  id       String   @id @default(uuid())
+  sheetId  String
+  topicId  String
+  position Int      @default(0)
+  createdAt DateTime @default(now())
+
+  sheet DSASheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  topic Topic    @relation(fields: [topicId], references: [id])
+
+  @@unique([sheetId, topicId])
+  @@unique([sheetId, position])
+}
+
+model Topic {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String?
+  order       Int      @default(0)
+  iconKey     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  problems     Problem[]
+  sheets       SheetTopic[]
+  userProgress UserSheetProgress[]
+
+  @@index([order])
+}
+
+model Problem {
+  id                  String            @id @default(uuid())
+  slug                String            @unique
+  title               String
+  difficulty          ProblemDifficulty @default(EASY)
+  topicId             String
+  pattern             String?
+  platform            Platform          @default(LEETCODE)
+  externalId          String?
+  platformProblemUrl  String
+  solutionUrl         String?
+  tags                String[]          @default([])
+  estimatedMinutes    Int?
+  timeComplexityHint  String?
+  spaceComplexityHint String?
+  isPublished         Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  topic  Topic          @relation(fields: [topicId], references: [id])
+  sheets SheetProblem[]
+
+  @@unique([platform, externalId])
+  @@index([topicId, difficulty])
+  @@index([isPublished])
+}
+
+/** Ordered membership of a problem in a sheet. */
+model SheetProblem {
+  id        String  @id @default(uuid())
+  sheetId   String
+  problemId String
+  position  Int
+  isCore    Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  sheet   DSASheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  problem Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, problemId])
+  @@unique([sheetId, position])
+}
+
+/** A user's progress on a sheet (started/continue/completed). */
+model UserSheetProgress {
+  id             String             @id @default(uuid())
+  userId         String
+  sheetId        String
+  status         SheetProgressStatus @default(NOT_STARTED)
+  currentTopicId String?
+  startedAt      DateTime           @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  user  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sheet DSASheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  topic Topic?   @relation(fields: [currentTopicId], references: [id])
+
+  @@unique([userId, sheetId])
+  @@index([userId, status])
+}

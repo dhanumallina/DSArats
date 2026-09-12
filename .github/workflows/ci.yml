@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: Typecheck · Lint · Test · Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dsarats
+          POSTGRES_PASSWORD: dsarats
+          POSTGRES_DB: dsarats_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dsarats"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://dsarats:dsarats@localhost:5432/dsarats_test?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-3f8a2c1d9e4b7a6f5c8d0e1f2a3b4c5d
+      JWT_REFRESH_SECRET: ci-refresh-secret-7c1d9e4b7a6f5c8d0e1f2a3b4c5d6e7f
+      JWT_ACCESS_TTL: 15m
+      REFRESH_TOKEN_TTL_DAYS: 30
+      CORS_ORIGIN: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma — apply migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Seed content
+        working-directory: apps/api
+        run: npx prisma db seed
+
+      - name: Typecheck
+        run: npm run typecheck --workspaces --if-present
+
+      - name: Lint
+        run: npm run lint --workspaces --if-present
+
+      - name: Test (API)
+        working-directory: apps/api
+        run: npm test
+
+      - name: Build (web)
+        working-directory: apps/web
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
