@@ -43,6 +43,12 @@ model User {
   sessions      Session[]
   sheetProgress UserSheetProgress[]
 
+  // Phase 4: progress, streak, daily challenge
+  problems             UserProblem[]
+  activities           ActivityLog[]
+  streaks              StreakRecord[]
+  challengeCompletions DailyChallengeCompletion[]
+
   @@index([status])
 }
 
@@ -183,6 +189,10 @@ model Problem {
   topic  Topic          @relation(fields: [topicId], references: [id])
   sheets SheetProblem[]
 
+  // Phase 4: per-user progress and daily challenge rotation
+  userProblems    UserProblem[]
+  dailyChallenges DailyChallenge[]
+
   @@unique([platform, externalId])
   @@index([topicId, difficulty])
   @@index([isPublished])
@@ -222,4 +232,114 @@ model UserSheetProgress {
 
   @@unique([userId, sheetId])
   @@index([userId, status])
+}
+
+// ── Phase 4: progress, streak & daily challenge ──────────────────────────────
+
+enum ProblemStatus {
+  NOT_STARTED
+  ATTEMPTED
+  SOLVED
+  NEEDS_REVISION
+  REVISED
+  MASTERED
+}
+
+/** A user's status on a problem — the core tracking record. */
+model UserProblem {
+  id             String        @id @default(uuid())
+  userId         String
+  problemId      String
+  status         ProblemStatus @default(NOT_STARTED)
+  firstSolvedAt  DateTime?
+  lastActivityAt DateTime?
+  solveCount     Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId])
+  @@index([userId, status])
+  @@index([userId, lastActivityAt])
+}
+
+/** Meaningful activity that can count toward a streak day (plan §4.3). */
+enum ActivityType {
+  PROBLEM_SOLVED
+  PROBLEM_ATTEMPTED
+  REVISION_COMPLETED
+  DAILY_CHALLENGE
+  NOTE_UPDATED
+  LEARNING_SESSION
+}
+
+model ActivityLog {
+  id         String       @id @default(uuid())
+  userId     String
+  type       ActivityType
+  /** problemId / challengeId the activity refers to, when applicable. */
+  refId      String?
+  metadata   Json?
+  occurredAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, occurredAt])
+  @@index([userId, type])
+}
+
+/** One row per (user, active day) — written idempotently so a day never double-counts. */
+model StreakRecord {
+  id             String   @id @default(uuid())
+  userId         String
+  activeDate     DateTime @db.Date
+  activityTypes  String[]
+  problemsSolved Int      @default(0)
+  sessionsCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activeDate])
+  @@index([userId, activeDate])
+}
+
+/** The single problem chosen for a calendar day. */
+model DailyChallenge {
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date
+  problemId String
+  /** Short, honest explanation of why this problem was chosen. */
+  reason    String?
+  /** Admin user id that scheduled it, when not auto-selected. */
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  problem     Problem                   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  completions DailyChallengeCompletion[]
+
+  @@unique([date])
+  @@index([problemId])
+}
+
+enum DailyChallengeStatus {
+  SOLVED
+  ATTEMPTED
+  SKIPPED
+}
+
+model DailyChallengeCompletion {
+  id          String               @id @default(uuid())
+  userId      String
+  challengeId String
+  status      DailyChallengeStatus
+  completedAt DateTime             @default(now())
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+  @@index([userId, completedAt])
 }
