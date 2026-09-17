@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
-import type { ProblemsQuery } from "@dsarats/shared";
+import type { ProblemsQuery, RevisionStateDto } from "@dsarats/shared";
 import { prisma } from "../db";
 import { decodeCursor, encodeCursor } from "../utils/pagination";
+import { toProgressDto } from "./progress.service";
+import { daysOverdue } from "./revision.service";
 
 const problemSelect = {
   id: true,
@@ -113,32 +115,68 @@ export async function listProblems(query: ProblemsQuery) {
   return { items: data, nextCursor };
 }
 
-export async function getProblemDetail(id: string) {
+/**
+ * Problem detail plus the requesting user's own progress and live revision state
+ * (both null when anonymous).
+ */
+export async function getProblemDetail(id: string, userId?: string) {
   const problem = await prisma.problem.findUnique({
     where: { id, isPublished: true },
     select: { ...problemSelect, _count: { select: { sheets: true } } },
   });
   if (!problem) return null;
 
-  // Related: same topic or same pattern, excluding itself.
-  const related = await prisma.problem.findMany({
-    where: {
-      isPublished: true,
-      id: { not: id },
-      OR: [
-        { topicId: problem.topicId },
-        ...(problem.pattern ? [{ pattern: problem.pattern }] : []),
-      ],
-    },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      difficulty: true,
-      topic: { select: { slug: true, name: true } },
-    },
-    take: 8,
-  });
+  const now = new Date();
 
-  return { problem, related };
+  // Related: same topic or same pattern, excluding itself.
+  const [related, viewer, revision] = await Promise.all([
+    prisma.problem.findMany({
+      where: {
+        isPublished: true,
+        id: { not: id },
+        OR: [
+          { topicId: problem.topicId },
+          ...(problem.pattern ? [{ pattern: problem.pattern }] : []),
+        ],
+      },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        difficulty: true,
+        topic: { select: { slug: true, name: true } },
+      },
+      take: 8,
+    }),
+    userId
+      ? prisma.userProblem.findUnique({ where: { userId_problemId: { userId, problemId: id } } })
+      : Promise.resolve(null),
+    userId
+      ? prisma.revisionSchedule.findUnique({
+          where: { userId_problemId: { userId, problemId: id } },
+          select: {
+            stage: true,
+            dueAt: true,
+            lastReviewedAt: true,
+            timesReviewed: true,
+            archivedAt: true,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  // A mastered (archived) schedule is history, not active state — do not surface it here.
+  const revisionState: RevisionStateDto | null =
+    revision && !revision.archivedAt
+      ? {
+          stage: revision.stage,
+          dueAt: revision.dueAt.toISOString(),
+          lastReviewedAt: revision.lastReviewedAt?.toISOString() ?? null,
+          timesReviewed: revision.timesReviewed,
+          daysOverdue: daysOverdue(revision.dueAt, now),
+          difficultyAfterRevision: viewer?.difficultyAfterRevision ?? null,
+        }
+      : null;
+
+  return { problem, related, viewer: viewer ? toProgressDto(viewer) : null, revision: revisionState };
 }

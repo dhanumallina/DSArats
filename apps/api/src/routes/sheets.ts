@@ -89,6 +89,16 @@ router.get("/:slug", optionalAuth, validate({ params: slugParamsSchema }), async
 
   if (!sheet) throw new ApiError(404, "NOT_FOUND", "Sheet not found");
 
+  // The viewer's own status per problem, in one query (absent for anonymous viewers).
+  const statusByProblem = new Map<string, string>();
+  if (userId && sheet.problems.length > 0) {
+    const rows = await prisma.userProblem.findMany({
+      where: { userId, problemId: { in: sheet.problems.map((sp) => sp.problemId) } },
+      select: { problemId: true, status: true },
+    });
+    for (const row of rows) statusByProblem.set(row.problemId, row.status);
+  }
+
   // Group ordered problems by the sheet's topic ordering.
   const topicOrder = sheet.topics.map((st) => st.topicId);
   interface Group {
@@ -106,6 +116,8 @@ router.get("/:slug", optionalAuth, validate({ params: slugParamsSchema }), async
       estimatedMinutes: number | null;
       isCore: boolean;
       position: number;
+      /** The viewer's status, or null when anonymous / never touched. */
+      viewerStatus: string | null;
     }>;
   }
   const groups = new Map<string, Group>();
@@ -128,6 +140,7 @@ router.get("/:slug", optionalAuth, validate({ params: slugParamsSchema }), async
       estimatedMinutes: sp.problem.estimatedMinutes,
       isCore: sp.isCore,
       position: sp.position,
+      viewerStatus: statusByProblem.get(sp.problem.id) ?? null,
     };
     if (group) {
       group.problems.push(entry);
@@ -156,7 +169,7 @@ router.get("/:slug", optionalAuth, validate({ params: slugParamsSchema }), async
     }
   }
 
-  // Viewer data: sheet-level progress only (per-problem status is Phase 4).
+  // Viewer data: sheet-level progress (per-problem status lives on each problem above).
   let viewerStatus: SheetProgressStatus | null = null;
   let currentTopicId: string | null = null;
   if (userId) {

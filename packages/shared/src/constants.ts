@@ -25,8 +25,29 @@ export const PROBLEM_STATUS = {
 } as const;
 export type ProblemStatus = (typeof PROBLEM_STATUS)[keyof typeof PROBLEM_STATUS];
 
+/** How a user finished (or declined) the daily challenge. */
+export const DAILY_CHALLENGE_STATUS = {
+  SOLVED: "SOLVED",
+  ATTEMPTED: "ATTEMPTED",
+  SKIPPED: "SKIPPED",
+} as const;
+export type DailyChallengeStatus =
+  (typeof DAILY_CHALLENGE_STATUS)[keyof typeof DAILY_CHALLENGE_STATUS];
+
 /** Revision intervals in days, indexed by stage (0..4). */
 export const REVISION_INTERVALS_DAYS = [1, 3, 7, 14, 30] as const;
+
+/** Highest revision stage — the 30-day interval repeats from here until mastered. */
+export const REVISION_MAX_STAGE = REVISION_INTERVALS_DAYS.length - 1;
+
+/** How hard a problem felt after a revision (self-reported, never inferred). */
+export const REVISION_DIFFICULTY = {
+  EASIER: "EASIER",
+  SAME: "SAME",
+  HARDER: "HARDER",
+} as const;
+export type RevisionDifficulty =
+  (typeof REVISION_DIFFICULTY)[keyof typeof REVISION_DIFFICULTY];
 
 /** Meaningful activity types that count toward a streak day. */
 export const STREAK_ACTIVITY_TYPES = [
@@ -75,6 +96,11 @@ export const LIMITS = {
   USERNAME_MAX: 20,
   DISPLAY_NAME_MAX: 60,
   BIO_MAX: 500,
+  /** Max length of a single notebook field. */
+  NOTE_FIELD_MAX: 20_000,
+  /** Weekly learning goal bounds, in problems per week. */
+  WEEKLY_GOAL_MIN: 1,
+  WEEKLY_GOAL_MAX: 100,
 } as const;
 
 /** Access token TTL. */

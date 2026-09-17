@@ -17,9 +17,12 @@ export interface PublicUser {
 export interface PublicProfile {
   username: string;
   displayName: string | null;
+  bio: string | null;
   avatarUrl: string | null;
+  /** IANA timezone — day boundaries for streaks are computed in this zone. */
   timezone: string;
   theme: Theme;
+  /** Weekly goal in problems per week, or null when unset. */
   learningGoal: number | null;
   onboardedAt: string | null;
   longestStreak: number;

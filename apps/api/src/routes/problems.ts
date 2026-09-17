@@ -1,9 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
-import { problemsQuerySchema } from "@dsarats/shared";
+import { noteUpsertSchema, problemProgressSchema, problemsQuerySchema } from "@dsarats/shared";
+import type { NoteUpsertInput, ProblemProgressInput } from "@dsarats/shared";
 import { ApiError } from "../services/auth.service";
+import { optionalAuth, requireAuth, type AuthedRequest } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { getProblemDetail, listProblems } from "../services/problem.service";
+import { setProblemStatus } from "../services/progress.service";
+import { getNote, upsertNote } from "../services/note.service";
 import { sendOk } from "../utils/response";
 
 const router = Router();
@@ -17,12 +21,49 @@ router.get("/", validate({ query: problemsQuerySchema }), async (req, res) => {
   sendOk(res, result);
 });
 
-/** GET /problems/:id — detail + related problems. */
-router.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {
+/** GET /problems/:id — detail + related problems + the viewer's own progress. */
+router.get("/:id", optionalAuth, validate({ params: idParamsSchema }), async (req: AuthedRequest, res) => {
   const { id } = req.params as z.infer<typeof idParamsSchema>;
-  const result = await getProblemDetail(id);
+  const result = await getProblemDetail(id, req.user?.id);
   if (!result) throw new ApiError(404, "NOT_FOUND", "Problem not found");
   sendOk(res, result);
 });
+
+/** GET /problems/:id/notes — the viewer's notebook entry, or null when none exists. */
+router.get("/:id/notes", requireAuth, validate({ params: idParamsSchema }), async (req: AuthedRequest, res) => {
+  const { id } = req.params as z.infer<typeof idParamsSchema>;
+  sendOk(res, await getNote(req.user!.id, id));
+});
+
+/**
+ * PUT /problems/:id/notes — create or partially update the notebook entry.
+ * Autosave-friendly: omitted fields are untouched, null clears a field.
+ */
+router.put(
+  "/:id/notes",
+  requireAuth,
+  validate({ params: idParamsSchema, body: noteUpsertSchema }),
+  async (req: AuthedRequest, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    sendOk(res, await upsertNote(req.user!.id, id, req.body as NoteUpsertInput));
+  },
+);
+
+/**
+ * PATCH /problems/:id/progress — set the user's status for a problem.
+ *
+ * Status, activity log, and streak update atomically; safe to retry with the same
+ * status (no duplicate activity or inflated counts).
+ */
+router.patch(
+  "/:id/progress",
+  requireAuth,
+  validate({ params: idParamsSchema, body: problemProgressSchema }),
+  async (req: AuthedRequest, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const { status } = req.body as ProblemProgressInput;
+    sendOk(res, await setProblemStatus(req.user!.id, id, status));
+  },
+);
 
 export default router;

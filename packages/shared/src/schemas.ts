@@ -61,15 +61,45 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
-/** PATCH /api/v1/users/me/profile */
+/**
+ * A timezone the runtime can actually resolve.
+ *
+ * Validated eagerly: an unknown zone is silently ignored by the streak code (it falls
+ * back to UTC), so accepting one would let a user believe their days roll over locally
+ * when they do not.
+ */
+const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1, "Timezone is required")
+  .max(64)
+  .refine(
+    (timezone) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    "Enter a valid IANA timezone, for example Asia/Kolkata",
+  );
+
+/** PATCH /api/v1/users/me/profile — partial update; null clears a field. */
 export const updateProfileSchema = z
   .object({
     username: usernameSchema.optional(),
-    displayName: z.string().trim().max(LIMITS.DISPLAY_NAME_MAX).optional(),
-    bio: z.string().trim().max(LIMITS.BIO_MAX).optional(),
-    timezone: z.string().min(1).max(64).optional(),
+    displayName: z.string().trim().max(LIMITS.DISPLAY_NAME_MAX).nullable().optional(),
+    bio: z.string().trim().max(LIMITS.BIO_MAX).nullable().optional(),
+    timezone: timezoneSchema.optional(),
     theme: z.enum([THEME.LIGHT, THEME.DARK, THEME.SYSTEM]).optional(),
-    learningGoal: z.number().int().min(1).max(100).nullable().optional(),
+    learningGoal: z
+      .number()
+      .int()
+      .min(LIMITS.WEEKLY_GOAL_MIN)
+      .max(LIMITS.WEEKLY_GOAL_MAX)
+      .nullable()
+      .optional(),
   })
   .strict();
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

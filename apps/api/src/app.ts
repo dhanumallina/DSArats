@@ -7,10 +7,16 @@ import { errorHandler, notFoundHandler } from "./middleware/error";
 import { authLimiter, generalLimiter } from "./middleware/rateLimit";
 import adminRouter from "./routes/admin";
 import authRouter from "./routes/auth";
+import dailyChallengeRouter from "./routes/dailyChallenge";
+import dashboardRouter from "./routes/dashboard";
 import healthRouter from "./routes/health";
 import problemsRouter from "./routes/problems";
+import progressRouter from "./routes/progress";
+import revisionRouter from "./routes/revision";
 import sheetsRouter from "./routes/sheets";
+import streakRouter from "./routes/streak";
 import topicsRouter from "./routes/topics";
+import usersRouter from "./routes/users";
 
 export function createApp() {
   const app = express();
@@ -42,6 +48,12 @@ export function createApp() {
   app.use("/api/v1/sheets", sheetsRouter);
   app.use("/api/v1/topics", topicsRouter);
   app.use("/api/v1/problems", problemsRouter);
+  app.use("/api/v1/daily-challenge", dailyChallengeRouter);
+  app.use("/api/v1/progress", progressRouter);
+  app.use("/api/v1/streak", streakRouter);
+  app.use("/api/v1/dashboard", dashboardRouter);
+  app.use("/api/v1/revision", revisionRouter);
+  app.use("/api/v1/users", usersRouter);
   app.use("/api/v1/admin", adminRouter);
   app.use("/api", healthRouter);
 

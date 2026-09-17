@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { DIFFICULTY, PLATFORM, SHEET_DIFFICULTY } from "./constants";
+import {
+  DAILY_CHALLENGE_STATUS,
+  DIFFICULTY,
+  LIMITS,
+  PLATFORM,
+  PROBLEM_STATUS,
+  REVISION_DIFFICULTY,
+  SHEET_DIFFICULTY,
+} from "./constants";
 
 const difficultyEnum = z.enum([DIFFICULTY.EASY, DIFFICULTY.MEDIUM, DIFFICULTY.HARD]);
 const sheetDifficultyEnum = z.enum([
@@ -33,6 +41,110 @@ export const problemsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 export type ProblemsQuery = z.infer<typeof problemsQuerySchema>;
+
+/** PATCH /api/v1/problems/:id/progress — set a user's status for one problem. */
+export const problemProgressSchema = z
+  .object({
+    status: z.enum([
+      PROBLEM_STATUS.NOT_STARTED,
+      PROBLEM_STATUS.ATTEMPTED,
+      PROBLEM_STATUS.SOLVED,
+      PROBLEM_STATUS.NEEDS_REVISION,
+      PROBLEM_STATUS.REVISED,
+      PROBLEM_STATUS.MASTERED,
+    ]),
+  })
+  .strict();
+export type ProblemProgressInput = z.infer<typeof problemProgressSchema>;
+
+/**
+ * GET /api/v1/daily-challenge — optional selection options.
+ *
+ * These only steer creation of the day's challenge: once it exists for the user's
+ * local date it stays stable, so the daily challenge is never re-rolled on refresh.
+ */
+export const dailyChallengeQuerySchema = z.object({
+  strategy: z.enum(["recommended", "random"]).default("recommended"),
+  topic: z.string().min(1).max(80).optional(),
+  difficulty: difficultyEnum.optional(),
+});
+export type DailyChallengeQuery = z.infer<typeof dailyChallengeQuerySchema>;
+
+/** POST /api/v1/daily-challenge/complete — mark today's challenge. */
+export const dailyChallengeCompleteSchema = z
+  .object({
+    status: z.enum([
+      DAILY_CHALLENGE_STATUS.SOLVED,
+      DAILY_CHALLENGE_STATUS.ATTEMPTED,
+      DAILY_CHALLENGE_STATUS.SKIPPED,
+    ]),
+  })
+  .strict();
+export type DailyChallengeCompleteInput = z.infer<typeof dailyChallengeCompleteSchema>;
+
+/** GET /api/v1/daily-challenge/history */
+export const dailyChallengeHistoryQuerySchema = z.object({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+export type DailyChallengeHistoryQuery = z.infer<typeof dailyChallengeHistoryQuerySchema>;
+
+/** GET /api/v1/streak — defaults to the user's current local month. */
+export const streakQuerySchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month must be formatted as YYYY-MM")
+    .optional(),
+});
+export type StreakQuery = z.infer<typeof streakQuerySchema>;
+
+/** GET /api/v1/progress/heatmap — defaults to the user's current local year. */
+export const heatmapQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+});
+export type HeatmapQuery = z.infer<typeof heatmapQuerySchema>;
+
+/** GET /api/v1/revision — the queue, or only what is due. */
+export const revisionQuerySchema = z.object({
+  due: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+export type RevisionQuery = z.infer<typeof revisionQuerySchema>;
+
+/** POST /api/v1/revision/:problemId/complete */
+export const revisionCompleteSchema = z
+  .object({
+    difficultyAfterRevision: z
+      .enum([
+        REVISION_DIFFICULTY.EASIER,
+        REVISION_DIFFICULTY.SAME,
+        REVISION_DIFFICULTY.HARDER,
+      ])
+      .optional(),
+  })
+  .strict();
+export type RevisionCompleteInput = z.infer<typeof revisionCompleteSchema>;
+
+/** GET /api/v1/revision/history */
+export const revisionHistoryQuerySchema = z.object({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+export type RevisionHistoryQuery = z.infer<typeof revisionHistoryQuerySchema>;
+
+/** PUT /api/v1/problems/:id/notes — partial, autosave-friendly (null clears a field). */
+export const noteUpsertSchema = z
+  .object({
+    approach: z.string().max(LIMITS.NOTE_FIELD_MAX).nullable().optional(),
+    mistakes: z.string().max(LIMITS.NOTE_FIELD_MAX).nullable().optional(),
+    optimalApproach: z.string().max(LIMITS.NOTE_FIELD_MAX).nullable().optional(),
+    revisionNotes: z.string().max(LIMITS.NOTE_FIELD_MAX).nullable().optional(),
+    keyPatterns: z.string().max(LIMITS.NOTE_FIELD_MAX).nullable().optional(),
+  })
+  .strict();
+export type NoteUpsertInput = z.infer<typeof noteUpsertSchema>;
 
 /** POST /api/v1/sheets/:slug/start */
 export const startSheetSchema = z.object({}).strict();

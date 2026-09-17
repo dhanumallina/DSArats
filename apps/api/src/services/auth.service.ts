@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { ERROR_CODES } from "@dsarats/shared";
-import type { LoginInput, RegisterInput, PublicUser } from "@dsarats/shared";
+import type { LoginInput, RegisterInput, PublicUser, UpdateProfileInput } from "@dsarats/shared";
 import { prisma } from "../db";
 import { hashPassword, verifyPassword } from "../utils/password";
 import {
@@ -36,6 +36,7 @@ function toPublicUser(user: {
   profile: {
     username: string;
     displayName: string | null;
+    bio: string | null;
     avatarUrl: string | null;
     timezone: string;
     theme: "LIGHT" | "DARK" | "SYSTEM";
@@ -54,6 +55,7 @@ function toPublicUser(user: {
       ? {
           username: user.profile.username,
           displayName: user.profile.displayName,
+          bio: user.profile.bio,
           avatarUrl: user.profile.avatarUrl,
           timezone: user.profile.timezone,
           theme: user.profile.theme,
@@ -75,6 +77,7 @@ const userWithProfile = {
     select: {
       username: true,
       displayName: true,
+      bio: true,
       avatarUrl: true,
       timezone: true,
       theme: true,
@@ -238,6 +241,39 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+}
+
+/**
+ * Apply a partial profile update and return the fresh public user.
+ *
+ * Prisma treats `undefined` as "leave unchanged" and `null` as an explicit clear, which
+ * is exactly the contract the settings form needs — so the validated body is passed
+ * through without extra bookkeeping.
+ */
+export async function updateProfile(
+  userId: string,
+  input: UpdateProfileInput,
+): Promise<PublicUser> {
+  const { username, ...rest } = input;
+
+  if (username) {
+    const taken = await prisma.profile.findUnique({
+      where: { username },
+      select: { userId: true },
+    });
+    if (taken && taken.userId !== userId) {
+      throw new ApiError(409, ERROR_CODES.CONFLICT, "That username is already taken", "username");
+    }
+  }
+
+  await prisma.profile.update({
+    where: { userId },
+    data: { ...rest, ...(username ? { username } : {}) },
+  });
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: userWithProfile });
+  if (!user) throw new ApiError(404, ERROR_CODES.NOT_FOUND, "User not found");
+  return toPublicUser(user);
 }
 
 export { toPublicUser, userWithProfile };
