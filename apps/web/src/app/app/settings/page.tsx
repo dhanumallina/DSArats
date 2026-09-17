@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Globe, Target } from "lucide-react";
+import { EyeOff, Globe, Target } from "lucide-react";
 import { LIMITS } from "@dsarats/shared";
-import type { MeResponse, PublicUser } from "@dsarats/shared";
+import type { MeResponse, ProfileVisibility, PublicUser } from "@dsarats/shared";
 import { apiFetch, getErrorMessage } from "@/lib/api";
 import { useMe } from "@/hooks/use-me";
 import { useToast } from "@/components/toast";
@@ -48,6 +49,9 @@ function SettingsForm({ user }: { user: PublicUser }) {
   const [goal, setGoal] = useState(
     user.profile?.learningGoal != null ? String(user.profile.learningGoal) : "",
   );
+  const [visibility, setVisibility] = useState<ProfileVisibility>(
+    user.profile?.visibility ?? "PRIVATE",
+  );
 
   // Keep the saved zone selectable even when it is not in the shortlist.
   const timezones = COMMON_TIMEZONES.includes(timezone)
@@ -73,12 +77,23 @@ function SettingsForm({ user }: { user: PublicUser }) {
           bio: bio.trim() === "" ? null : bio.trim(),
           timezone,
           learningGoal: goalValue === "" ? null : Number(goalValue),
+          visibility,
         },
       }),
     onSuccess: (res) => {
       // The signed-in user changed — refresh /me plus anything derived from the profile.
       queryClient.setQueryData<MeResponse>(["me"], res);
-      for (const key of ["dashboard", "streak", "progress", "heatmap", "revision"]) {
+      for (const key of [
+        "dashboard",
+        "streak",
+        "progress",
+        "heatmap",
+        "revision",
+        // Publishing (or hiding) a profile changes what the community surfaces show.
+        "public-profile",
+        "leaderboard",
+        "community-activity",
+      ]) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
       toast("Settings saved.", "success");
@@ -190,6 +205,43 @@ function SettingsForm({ user }: { user: PublicUser }) {
             Your dashboard shows progress toward this goal using problems you actually solved
             this week.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <EyeOff className="size-4 text-accent" aria-hidden />
+            Profile visibility
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Select
+            label="Who can see your profile"
+            value={visibility}
+            onChange={(event) => setVisibility(event.target.value as ProfileVisibility)}
+          >
+            <option value="PRIVATE">Private — only you</option>
+            <option value="PUBLIC">Public — anyone with the link</option>
+          </Select>
+
+          <p className="text-sm text-muted">
+            {visibility === "PRIVATE"
+              ? "Your profile is private. Nobody else can open it, and you are left off the leaderboard."
+              : "Your profile is published: counts of what you've solved, your streak, level, and badges. Your notebook, email, and timezone are never shown."}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href={`/app/profile/${user.profile?.username}`}
+              className="text-sm text-link hover:underline"
+            >
+              {visibility === "PUBLIC" ? "View your public profile" : "Preview your profile"}
+            </Link>
+            <span className="text-xs text-muted">
+              Published profiles also appear on the leaderboard.
+            </span>
+          </div>
         </CardContent>
       </Card>
 

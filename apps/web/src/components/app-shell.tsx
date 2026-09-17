@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
+  CalendarRange,
   Home,
   Layers,
   LayoutDashboard,
@@ -14,7 +15,9 @@ import {
   NotebookPen,
   RotateCcw,
   Settings,
+  Swords,
   Target,
+  Trophy,
   Users,
 } from "lucide-react";
 import type { PublicUser } from "@dsarats/shared";
@@ -37,6 +40,7 @@ const NAV_GROUPS = [
     label: "Track",
     items: [
       { href: "/app/daily-challenge", label: "Daily Challenge", icon: CalendarDays },
+      { href: "/app/weekly-challenge", label: "Weekly Challenge", icon: CalendarRange },
       { href: "/app/revision", label: "Revision", icon: RotateCcw },
       { href: "/app/progress", label: "Progress", icon: BarChart3 },
     ],
@@ -45,6 +49,13 @@ const NAV_GROUPS = [
     label: "Grow",
     items: [
       { href: "/app/analytics", label: "Analytics", icon: NotebookPen },
+      { href: "/app/leaderboards", label: "Leaderboard", icon: Trophy },
+      { href: "/app/contests", label: "Contests", icon: Swords },
+    ],
+  },
+  {
+    label: "Connect",
+    items: [
       { href: "/app/community", label: "Community", icon: Users },
       { href: "/app/settings", label: "Settings", icon: Settings },
     ],
