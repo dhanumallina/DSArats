@@ -54,6 +54,9 @@ model User {
   revisionSchedules RevisionSchedule[]
   notes             Note[]
 
+  // Phase 6: gamification
+  achievements UserAchievement[]
+
   @@index([status])
 }
 
@@ -418,4 +421,66 @@ model Note {
   problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   @@unique([userId, problemId])
+}
+
+// ── Phase 6: gamification ────────────────────────────────────────────────────
+
+/**
+ * Which user statistic an achievement's criteria is measured against.
+ *
+ * Every metric is derived from the user's own rows, so an achievement can never be
+ * awarded by hand or inferred from anything the user did not actually do.
+ */
+enum AchievementMetric {
+  SOLVED
+  MASTERED
+  REVISIONS
+  DAILY_CHALLENGES
+  LONGEST_STREAK
+  TOPICS_ENGAGED
+  HARD_SOLVED
+  SHEETS_COMPLETED
+}
+
+/**
+ * Catalogue row for one achievement — the thing an unlock points at.
+ *
+ * Definitions live in `@dsarats/shared` and are synced here so unlocks can carry a
+ * foreign key and admins can later manage copy without a code change.
+ */
+model Achievement {
+  id          String            @id @default(uuid())
+  key         String            @unique
+  name        String
+  description String
+  iconKey     String
+  metric      AchievementMetric
+  threshold   Int
+  order       Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  unlocks UserAchievement[]
+
+  @@index([order])
+}
+
+/**
+ * One unlock per (user, achievement).
+ *
+ * Evaluation runs on every meaningful activity and inserts with skipDuplicates, so
+ * re-checking can never double-award. `unlockedAt` is the moment the criteria were
+ * first observed as met — it is never backdated to a synthetic date.
+ */
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId, unlockedAt])
 }
