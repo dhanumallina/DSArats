@@ -9,9 +9,11 @@ import achievementsRouter from "./routes/achievements";
 import adminRouter from "./routes/admin";
 import analyticsRouter from "./routes/analytics";
 import authRouter from "./routes/auth";
+import communityRouter from "./routes/community";
 import dailyChallengeRouter from "./routes/dailyChallenge";
 import dashboardRouter from "./routes/dashboard";
 import healthRouter from "./routes/health";
+import leaderboardsRouter from "./routes/leaderboards";
 import problemsRouter from "./routes/problems";
 import progressRouter from "./routes/progress";
 import revisionRouter from "./routes/revision";
@@ -19,6 +21,7 @@ import sheetsRouter from "./routes/sheets";
 import streakRouter from "./routes/streak";
 import topicsRouter from "./routes/topics";
 import usersRouter from "./routes/users";
+import weeklyChallengeRouter from "./routes/weeklyChallenge";
 import xpRouter from "./routes/xp";
 
 export function createApp() {
@@ -60,6 +63,9 @@ export function createApp() {
   app.use("/api/v1/analytics", analyticsRouter);
   app.use("/api/v1/xp", xpRouter);
   app.use("/api/v1/achievements", achievementsRouter);
+  app.use("/api/v1/leaderboards", leaderboardsRouter);
+  app.use("/api/v1/community", communityRouter);
+  app.use("/api/v1/weekly-challenge", weeklyChallengeRouter);
   app.use("/api/v1/admin", adminRouter);
   app.use("/api", healthRouter);
 

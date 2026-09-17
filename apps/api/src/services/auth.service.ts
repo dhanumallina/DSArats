@@ -43,6 +43,7 @@ function toPublicUser(user: {
     learningGoal: number | null;
     onboardedAt: Date | null;
     longestStreak: number;
+    visibility: "PRIVATE" | "PUBLIC";
   } | null;
 }): PublicUser {
   return {
@@ -62,6 +63,7 @@ function toPublicUser(user: {
           learningGoal: user.profile.learningGoal,
           onboardedAt: user.profile.onboardedAt?.toISOString() ?? null,
           longestStreak: user.profile.longestStreak,
+          visibility: user.profile.visibility,
         }
       : null,
   };
@@ -84,6 +86,7 @@ const userWithProfile = {
       learningGoal: true,
       onboardedAt: true,
       longestStreak: true,
+      visibility: true,
     },
   },
 } as const;

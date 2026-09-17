@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PROFILE_VISIBILITY } from "./community-types";
 import { LIMITS, THEME } from "./constants";
 
 const emailSchema = z
@@ -100,6 +101,8 @@ export const updateProfileSchema = z
       .max(LIMITS.WEEKLY_GOAL_MAX)
       .nullable()
       .optional(),
+    /** Phase 7: opt in (or back out of) publishing the profile. */
+    visibility: z.enum([PROFILE_VISIBILITY.PRIVATE, PROFILE_VISIBILITY.PUBLIC]).optional(),
   })
   .strict();
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

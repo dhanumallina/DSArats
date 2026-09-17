@@ -1,3 +1,4 @@
+import type { ProfileVisibility } from "./community-types";
 import type { ApiErrorBody } from "./errors";
 import type { Theme, UserRole } from "./constants";
 
@@ -26,6 +27,8 @@ export interface PublicProfile {
   learningGoal: number | null;
   onboardedAt: string | null;
   longestStreak: number;
+  /** Phase 7: whether other learners may see this profile (private until opted in). */
+  visibility: ProfileVisibility;
 }
 
 /** Shape returned by GET /api/v1/auth/me. */

@@ -1,4 +1,6 @@
 export * from "./analytics-types";
+export * from "./community-schemas";
+export * from "./community-types";
 export * from "./constants";
 export * from "./content-schemas";
 export * from "./content-types";

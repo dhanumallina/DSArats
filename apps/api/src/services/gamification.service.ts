@@ -31,6 +31,16 @@ function isSolvedRow(row: { status: string; firstSolvedAt: Date | null }): boole
   return row.firstSolvedAt !== null || (SOLVED_STATUSES as readonly string[]).includes(row.status);
 }
 
+/**
+ * The app-wide "is this problem solved?" rule, exported for callers that need it.
+ *
+ * It lives here rather than in progress.service because progress.service depends on this
+ * module (for achievement evaluation), so sharing it the other way would be a cycle.
+ */
+export function isSolvedProgress(row: { status: string; firstSolvedAt: Date | null }): boolean {
+  return isSolvedRow(row);
+}
+
 /** The client `prisma` and a transaction client share every method used here. */
 type Db = Prisma.TransactionClient;
 
