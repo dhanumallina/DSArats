@@ -101,6 +101,8 @@ export function ProgressControls({
         "revision",
         "revision-history",
         "daily-challenge",
+        "analytics",
+        "achievements",
       ]) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }

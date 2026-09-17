@@ -51,7 +51,16 @@ export default function DailyChallengePage() {
       }),
     onSuccess: (res) => {
       // The challenge feeds the streak and the dashboard, so refresh all of them.
-      for (const key of ["daily-challenge", "daily-challenge-history", "dashboard", "progress", "streak", "heatmap"]) {
+      for (const key of [
+        "daily-challenge",
+        "daily-challenge-history",
+        "dashboard",
+        "progress",
+        "streak",
+        "heatmap",
+        "analytics",
+        "achievements",
+      ]) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
       toast(

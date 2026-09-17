@@ -120,6 +120,8 @@ export default function RevisionPage() {
         "progress",
         "streak",
         "heatmap",
+        "analytics",
+        "achievements",
       ]) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
