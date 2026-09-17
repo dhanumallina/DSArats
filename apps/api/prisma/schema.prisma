@@ -57,6 +57,10 @@ model User {
   // Phase 6: gamification
   achievements UserAchievement[]
 
+  // Phase 7: community
+  createdGroups    StudyGroup[]    @relation("GroupCreator")
+  groupMemberships GroupMember[]
+
   @@index([status])
 }
 
@@ -69,6 +73,8 @@ model Profile {
   bio           String?
   timezone      String   @default("UTC")
   theme         Theme    @default(SYSTEM)
+  /** Phase 7: who may see this profile. Private until the learner opts in. */
+  visibility    ProfileVisibility @default(PRIVATE)
   learningGoal  Int?
   longestStreak Int      @default(0)
   onboardedAt   DateTime?
@@ -204,6 +210,9 @@ model Problem {
   // Phase 5: spaced revision & notebook
   revisionSchedules RevisionSchedule[]
   notes             Note[]
+
+  // Phase 7: weekly challenge membership
+  weeklyChallenges WeeklyChallengeProblem[]
 
   @@unique([platform, externalId])
   @@index([topicId, difficulty])
@@ -483,4 +492,94 @@ model UserAchievement {
 
   @@unique([userId, achievementId])
   @@index([userId, unlockedAt])
+}
+
+// ── Phase 7: community & advanced ────────────────────────────────────────────
+
+/**
+ * Who may see a learner's profile.
+ *
+ * Private is the default, so nobody is exposed by merely signing up — publishing is an
+ * explicit opt-in. The owner always sees their own profile either way.
+ */
+enum ProfileVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+/** PUBLIC groups are listable and open to join; PRIVATE ones are invite-only. */
+enum GroupVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+}
+
+/** A study group learners can join. */
+model StudyGroup {
+  id          String          @id @default(uuid())
+  slug        String          @unique
+  name        String
+  description String?
+  visibility  GroupVisibility @default(PUBLIC)
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  createdBy User          @relation("GroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members   GroupMember[]
+
+  @@index([visibility, createdAt])
+}
+
+/** Membership of one learner in one group. At most one row per (group, user). */
+model GroupMember {
+  id       String    @id @default(uuid())
+  groupId  String
+  userId   String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+/**
+ * The shared problem set for one ISO week.
+ *
+ * The same set is shown to every learner so progress against it is comparable. It is
+ * created lazily on the first read of a week and then kept, so it never re-rolls
+ * mid-week and cannot be re-rolled by refreshing.
+ */
+model WeeklyChallenge {
+  id          String   @id @default(uuid())
+  /** ISO week key, e.g. 2026-W38. */
+  weekKey     String   @unique
+  title       String
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  problems WeeklyChallengeProblem[]
+
+  @@index([weekKey])
+}
+
+model WeeklyChallengeProblem {
+  id          String @id @default(uuid())
+  challengeId String
+  problemId   String
+  position    Int
+
+  challenge WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  problem   Problem         @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, problemId])
+  @@unique([challengeId, position])
 }
