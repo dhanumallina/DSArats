@@ -47,7 +47,12 @@ model User {
   problems             UserProblem[]
   activities           ActivityLog[]
   streaks              StreakRecord[]
+  dailyChallenges      DailyChallenge[]
   challengeCompletions DailyChallengeCompletion[]
+
+  // Phase 5: spaced revision & notebook
+  revisionSchedules RevisionSchedule[]
+  notes             Note[]
 
   @@index([status])
 }
@@ -193,6 +198,10 @@ model Problem {
   userProblems    UserProblem[]
   dailyChallenges DailyChallenge[]
 
+  // Phase 5: spaced revision & notebook
+  revisionSchedules RevisionSchedule[]
+  notes             Note[]
+
   @@unique([platform, externalId])
   @@index([topicId, difficulty])
   @@index([isPublished])
@@ -254,8 +263,11 @@ model UserProblem {
   firstSolvedAt  DateTime?
   lastActivityAt DateTime?
   solveCount     Int           @default(0)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  /** The user's honest self-rating after the most recent revision (Phase 5). */
+  difficultyAfterRevision RevisionDifficulty?
+  lastRevisionAt          DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
@@ -306,9 +318,10 @@ model StreakRecord {
   @@index([userId, activeDate])
 }
 
-/** The single problem chosen for a calendar day. */
+/** The problem chosen for one user's calendar day (in their own timezone). */
 model DailyChallenge {
   id        String   @id @default(uuid())
+  userId    String
   date      DateTime @db.Date
   problemId String
   /** Short, honest explanation of why this problem was chosen. */
@@ -317,10 +330,11 @@ model DailyChallenge {
   createdBy String?
   createdAt DateTime @default(now())
 
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem     Problem                   @relation(fields: [problemId], references: [id], onDelete: Cascade)
   completions DailyChallengeCompletion[]
 
-  @@unique([date])
+  @@unique([userId, date])
   @@index([problemId])
 }
 
@@ -342,4 +356,66 @@ model DailyChallengeCompletion {
 
   @@unique([userId, challengeId])
   @@index([userId, completedAt])
+}
+
+// ── Phase 5: spaced revision & notebook ──────────────────────────────────────
+
+enum RevisionDifficulty {
+  EASIER
+  SAME
+  HARDER
+}
+
+/**
+ * Spaced-revision schedule for one (user, problem).
+ *
+ * `stage` indexes REVISION_INTERVALS_DAYS (1/3/7/14/30); each completed revision
+ * advances it by one and pushes `dueAt` out, capping at the final interval.
+ *
+ * Mastering archives the row (`archivedAt` set) instead of deleting it, so completed
+ * revisions stay visible in the user's history (plan §4.4). Active queues filter on
+ * `archivedAt: null`; re-solving an archived problem restarts the cycle.
+ */
+model RevisionSchedule {
+  id             String    @id @default(uuid())
+  userId         String
+  problemId      String
+  stage          Int       @default(0)
+  dueAt          DateTime
+  lastReviewedAt DateTime?
+  timesReviewed  Int       @default(0)
+  /** Set when the problem is mastered; the row is kept for history. */
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId])
+  @@index([userId, dueAt])
+}
+
+/**
+ * The user's notebook entry for one problem.
+ *
+ * Every field is nullable and updated independently so the client can autosave one
+ * field at a time without clobbering the rest.
+ */
+model Note {
+  id              String   @id @default(uuid())
+  userId          String
+  problemId       String
+  approach        String?
+  mistakes        String?
+  optimalApproach String?
+  revisionNotes   String?
+  keyPatterns     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId])
 }
