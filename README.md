@@ -6,7 +6,7 @@ DSARats is a production-quality, full-stack DSA learning platform: structured sh
 
 ## Status
 
-Phases 1–5 are **complete**.
+Phases 1–6 are **complete**.
 
 | Phase | Delivers | State |
 |---|---|---|
@@ -15,8 +15,9 @@ Phases 1–5 are **complete**.
 | 3 · Sheets & problem system | Seeded catalog, admin CRUD, browse/search/detail, sheet progress | ✅ |
 | 4 · Progress, streak & daily challenge | Transactional statuses, weekly activity, timezone-aware streaks, per-user daily challenge, dashboard/progress APIs + UI | ✅ |
 | 5 · Revision & notebook | Spaced revision (1→3→7→14→30), due queue + history, per-problem notebook with autosave | ✅ |
+| 6 · Analytics, gamification & readiness | Charts (coverage, difficulty, solves over time, revision), XP + levels, achievements, labelled interview-readiness estimate | ✅ |
 
-Next: **Phase 6 — Analytics, Gamification & Interview Readiness**.
+Next: **Phase 7 — Community & Advanced (post-MVP)**.
 
 - **[Phase 1 Product Plan](docs/PHASE-1-PRODUCT-PLAN.md)** — architecture, sitemap, user flows, database ERD, API plan, design tokens, and the 12-phase roadmap.
 
