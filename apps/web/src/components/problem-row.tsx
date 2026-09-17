@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
-import type { Difficulty } from "@dsarats/shared";
+import { CheckCircle2, ExternalLink, Flag } from "lucide-react";
+import type { Difficulty, ProblemStatus } from "@dsarats/shared";
 import { DifficultyBadge } from "@/components/difficulty-badge";
 
 export interface ProblemRowData {
@@ -11,6 +11,34 @@ export interface ProblemRowData {
   platformProblemUrl: string;
   estimatedMinutes?: number | null;
   isCore?: boolean;
+  /** The authenticated viewer's status, or null/undefined when anonymous / untouched. */
+  viewerStatus?: ProblemStatus | null;
+}
+
+/** A short, text-labelled status so meaning never depends on colour alone. */
+function ViewerStatus({ status }: { status: ProblemStatus | null | undefined }) {
+  if (!status || status === "NOT_STARTED") return null;
+
+  if (status === "NEEDS_REVISION") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-error">
+        <Flag className="size-3.5" aria-hidden />
+        Revise
+      </span>
+    );
+  }
+
+  if (status === "ATTEMPTED") {
+    return <span className="text-xs text-secondary">Attempted</span>;
+  }
+
+  const label = status === "MASTERED" ? "Mastered" : status === "REVISED" ? "Revised" : "Solved";
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-success">
+      <CheckCircle2 className="size-3.5" aria-hidden />
+      {label}
+    </span>
+  );
 }
 
 interface ProblemRowProps {
@@ -39,6 +67,7 @@ export function ProblemRow({ problem, href, index }: ProblemRowProps) {
           )}
           <DifficultyBadge difficulty={problem.difficulty} />
           {problem.isCore && <span className="text-xs text-muted">core</span>}
+          <ViewerStatus status={problem.viewerStatus} />
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
           {problem.pattern && <span>{problem.pattern}</span>}
