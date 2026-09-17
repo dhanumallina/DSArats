@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, Clock, ExternalLink } from "lucide-react";
+import { ArrowLeft, Clock, ExternalLink } from "lucide-react";
 import type { ProblemDetailResponse } from "@dsarats/shared";
 import { ApiError, apiFetch } from "@/lib/api";
 import { DifficultyBadge } from "@/components/difficulty-badge";
@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Notebook } from "./notebook";
+import { ProgressControls } from "./progress-controls";
 
 const PLATFORM_LABEL: Record<string, string> = {
   LEETCODE: "LeetCode",
@@ -69,6 +71,8 @@ export default function ProblemDetailPage() {
   if (!problem) return null;
 
   const related = data?.related ?? [];
+  const viewer = data?.viewer ?? null;
+  const revision = data?.revision ?? null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -158,21 +162,9 @@ export default function ProblemDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="size-4 text-accent" aria-hidden />
-            Notebook &amp; revision
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EmptyState
-            as="h3"
-            title="Notes and revision are coming"
-            description="From Phase 5 you will be able to record your approach, mistakes, and complexity here, and DSARats will schedule this problem for spaced revision."
-          />
-        </CardContent>
-      </Card>
+      <ProgressControls problemId={problem.id} viewer={viewer} revision={revision} />
+
+      <Notebook problemId={problem.id} />
 
       {related.length > 0 ? (
         <Card>
