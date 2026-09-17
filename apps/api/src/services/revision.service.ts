@@ -11,13 +11,24 @@ import type {
 import { prisma } from "../db";
 import { ApiError } from "./auth.service";
 import { recomputeStreaks, recordActivity } from "./activity.service";
-import { getUserTimezone } from "./streak.service";
+import { evaluateAchievements } from "./gamification.service";
+import { dateKeyToUtcDate, getUserTimezone, localDateKey } from "./streak.service";
 import { decodeCursor, encodeCursor } from "../utils/pagination";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Display cap for the queue — `dueCount` still reports the true total. */
 const QUEUE_LIMIT = 50;
+
+/** Aggregate revision numbers used by analytics and the readiness estimate. */
+export interface RevisionCounts {
+  totalReviews: number;
+  reviewsLast30Days: number;
+  activeSchedules: number;
+  mastered: number;
+  dueNow: number;
+  overdue: number;
+}
 
 const revisionProblemSelect = {
   id: true,
@@ -271,6 +282,9 @@ export async function completeRevision(
     return { updated: savedSchedule, rating: userProblem.difficultyAfterRevision, streaks: state };
   });
 
+  // Phase 6: completed after the commit, so unlocking never lengthens the transaction.
+  await evaluateAchievements(prisma, userId, now);
+
   const streak: StreakSummaryDto = {
     current: streaks.current,
     longest: Math.max(streaks.longest, cachedLongest),
@@ -334,6 +348,52 @@ export async function getRevisionHistory(
       hasMore && last
         ? encodeCursor({ createdAt: last.lastReviewedAt!.toISOString(), id: last.id })
         : null,
+  };
+}
+
+/**
+ * Aggregate revision numbers, for analytics.
+ *
+ * `totalReviews` is the schedule's own counter (sum of `timesReviewed`) — the same
+ * number the revision history and the XP breakdown use, so the pages cannot disagree.
+ * The 30-day window is the one figure that has to come from the activity log, because
+ * that is the only place a per-review timestamp is kept.
+ */
+export async function getRevisionCounts(
+  userId: string,
+  timezone: string,
+  now: Date = new Date(),
+): Promise<RevisionCounts> {
+  const active = { userId, archivedAt: null } as const;
+  // "Overdue" means due before the start of the user's local day — i.e. actually missed.
+  const startOfLocalDay = dateKeyToUtcDate(localDateKey(now, timezone));
+
+  const [totals, reviewsLast30Days, activeSchedules, mastered, dueNow, overdue] = await Promise.all([
+    prisma.revisionSchedule.aggregate({ where: { userId }, _sum: { timesReviewed: true } }),
+    prisma.activityLog.count({
+      where: {
+        userId,
+        type: "REVISION_COMPLETED",
+        occurredAt: { gte: new Date(now.getTime() - 30 * DAY_MS) },
+      },
+    }),
+    prisma.revisionSchedule.count({ where: active }),
+    prisma.revisionSchedule.count({ where: { userId, archivedAt: { not: null } } }),
+    prisma.revisionSchedule.count({
+      where: { ...active, dueAt: { lte: now }, problem: { isPublished: true } },
+    }),
+    prisma.revisionSchedule.count({
+      where: { ...active, dueAt: { lt: startOfLocalDay }, problem: { isPublished: true } },
+    }),
+  ]);
+
+  return {
+    totalReviews: totals._sum.timesReviewed ?? 0,
+    reviewsLast30Days,
+    activeSchedules,
+    mastered,
+    dueNow,
+    overdue,
   };
 }
 

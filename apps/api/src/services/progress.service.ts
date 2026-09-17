@@ -12,6 +12,7 @@ import type {
 import { prisma } from "../db";
 import { ApiError } from "./auth.service";
 import { recomputeStreaks, recordActivity } from "./activity.service";
+import { evaluateAchievements } from "./gamification.service";
 import { getStreakSummary, listActivityDays, localDateKey } from "./streak.service";
 import { archiveRevisionSchedule, ensureRevisionSchedule } from "./revision.service";
 
@@ -150,6 +151,10 @@ export async function setProblemStatus(
 
     return { userProblem: updated, streaks: state };
   });
+
+  // Phase 6: run after the write commits. Achievements are then timestamped to the
+  // activity that earned them, without adding work to the contended transaction.
+  await evaluateAchievements(prisma, userId, now);
 
   return {
     progress: toProgressDto(userProblem),

@@ -38,6 +38,11 @@ interface RecordActivityInput {
  * The streak upsert is keyed on (userId, activeDate), so any number of meaningful
  * activities on the same local day produce exactly one streak day — duplicates can
  * never double-count.
+ *
+ * Deliberately stays inside the caller's transaction and does nothing else: every
+ * activity write for the same user contends on today's streak row, so extra work here
+ * would lengthen the critical section. Callers run achievement evaluation after their
+ * transaction commits instead.
  */
 export async function recordActivity(
   tx: Prisma.TransactionClient,
@@ -55,32 +60,32 @@ export async function recordActivity(
     data: { userId, type, refId: refId ?? null, metadata, occurredAt: now },
   });
 
-  if (!countsTowardStreak(type)) return;
+  if (countsTowardStreak(type)) {
+    const activeDate = dateKeyToUtcDate(localDateKey(now, timezone));
+    const existing = await tx.streakRecord.findUnique({
+      where: { userId_activeDate: { userId, activeDate } },
+    });
 
-  const activeDate = dateKeyToUtcDate(localDateKey(now, timezone));
-  const existing = await tx.streakRecord.findUnique({
-    where: { userId_activeDate: { userId, activeDate } },
-  });
+    // Merge rather than push, so the day's type list never accumulates duplicates.
+    const activityTypes = [...new Set([...(existing?.activityTypes ?? []), type])];
+    const solvedIncrement = (countsAsSolved ?? type === "PROBLEM_SOLVED") ? 1 : 0;
 
-  // Merge rather than push, so the day's type list never accumulates duplicates.
-  const activityTypes = [...new Set([...(existing?.activityTypes ?? []), type])];
-  const solvedIncrement = (countsAsSolved ?? type === "PROBLEM_SOLVED") ? 1 : 0;
-
-  await tx.streakRecord.upsert({
-    where: { userId_activeDate: { userId, activeDate } },
-    create: {
-      userId,
-      activeDate,
-      activityTypes,
-      problemsSolved: solvedIncrement,
-      sessionsCount: 1,
-    },
-    update: {
-      activityTypes,
-      problemsSolved: { increment: solvedIncrement },
-      sessionsCount: { increment: 1 },
-    },
-  });
+    await tx.streakRecord.upsert({
+      where: { userId_activeDate: { userId, activeDate } },
+      create: {
+        userId,
+        activeDate,
+        activityTypes,
+        problemsSolved: solvedIncrement,
+        sessionsCount: 1,
+      },
+      update: {
+        activityTypes,
+        problemsSolved: { increment: solvedIncrement },
+        sessionsCount: { increment: 1 },
+      },
+    });
+  }
 }
 
 /** Recompute a user's streak state from their records, in their own timezone. */

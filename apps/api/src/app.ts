@@ -5,7 +5,9 @@ import helmet from "helmet";
 import { config, isProduction } from "./config";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { authLimiter, generalLimiter } from "./middleware/rateLimit";
+import achievementsRouter from "./routes/achievements";
 import adminRouter from "./routes/admin";
+import analyticsRouter from "./routes/analytics";
 import authRouter from "./routes/auth";
 import dailyChallengeRouter from "./routes/dailyChallenge";
 import dashboardRouter from "./routes/dashboard";
@@ -17,6 +19,7 @@ import sheetsRouter from "./routes/sheets";
 import streakRouter from "./routes/streak";
 import topicsRouter from "./routes/topics";
 import usersRouter from "./routes/users";
+import xpRouter from "./routes/xp";
 
 export function createApp() {
   const app = express();
@@ -54,6 +57,9 @@ export function createApp() {
   app.use("/api/v1/dashboard", dashboardRouter);
   app.use("/api/v1/revision", revisionRouter);
   app.use("/api/v1/users", usersRouter);
+  app.use("/api/v1/analytics", analyticsRouter);
+  app.use("/api/v1/xp", xpRouter);
+  app.use("/api/v1/achievements", achievementsRouter);
   app.use("/api/v1/admin", adminRouter);
   app.use("/api", healthRouter);
 

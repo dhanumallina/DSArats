@@ -12,6 +12,7 @@ import type {
 import { prisma } from "../db";
 import { ApiError } from "./auth.service";
 import { recomputeStreaks, recordActivity } from "./activity.service";
+import { evaluateAchievements } from "./gamification.service";
 import { dateKeyToUtcDate, getStreakSummary, localDateKey, utcDateToKey } from "./streak.service";
 import { decodeCursor, encodeCursor } from "../utils/pagination";
 
@@ -324,6 +325,9 @@ export async function completeChallenge(
 
     return { completion: saved, streaks: state };
   });
+
+  // Phase 6: completed after the commit, so unlocking never lengthens the transaction.
+  await evaluateAchievements(prisma, userId, now);
 
   const streak: StreakSummaryDto = {
     current: streaks.current,
